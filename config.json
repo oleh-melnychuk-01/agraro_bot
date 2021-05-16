@@ -1,0 +1,5 @@
+{
+    "db_name": "agrarodb",
+    "api_key": "1863775167:AAHwBgjQNyB0pBnGpK_57-X2ay_FB378JQs",
+    "connection_string": "mongodb://atlasAdmin:atlasAdmin@cluster0-shard-00-00.kqozh.mongodb.net:27017,cluster0-shard-00-01.kqozh.mongodb.net:27017,cluster0-shard-00-02.kqozh.mongodb.net:27017/myFirstDatabase?ssl=true&replicaSet=atlas-txpoch-shard-0&authSource=admin&retryWrites=true&w=majority"
+}
