@@ -132,9 +132,9 @@ class DialogManager:
 
     def default_message(self, message):
         markup = types.ReplyKeyboardMarkup(row_width=1)
-        btn1 = types.KeyboardButton('Облік автотранспорту')
-        btn2 = types.KeyboardButton('Облік залишків палива')
-        btn3 = types.KeyboardButton('Калькулятори')
+        btn1 = types.KeyboardButton('🚜 Облік автотранспорту')
+        btn2 = types.KeyboardButton('⛽ Облік залишків палива')
+        btn3 = types.KeyboardButton('🧮 Калькулятори')
         markup.add(btn1, btn2, btn3)
         self.bot.send_message(message.chat.id, "Виберіть:", reply_markup=markup)
 
@@ -211,17 +211,17 @@ class DialogManager:
 
             self.car_manager.add(car)
 
-        if message.text == 'Облік автотранспорту':
+        if message.text == '🚜 Облік автотранспорту':
             markup = types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
-            btn1 = types.KeyboardButton('Додати автомобіль')
-            btn2 = types.KeyboardButton('Видалити автомобіль')
-            btn3 = types.KeyboardButton('Переглянути список всіх автомобілів')
-            btn4 = types.KeyboardButton('Назад')
+            btn1 = types.KeyboardButton('🟢 Додати автомобіль')
+            btn2 = types.KeyboardButton('🔴 Видалити автомобіль')
+            btn3 = types.KeyboardButton('📝 Переглянути список всіх автомобілів')
+            btn4 = types.KeyboardButton('⬅️ Назад')
             markup.add(btn1, btn2, btn3, btn4)
             self.bot.send_message(message.chat.id, "Виберіть:", reply_markup=markup)    
             return True
 
-        if message.text == 'Додати автомобіль':
+        if message.text == '🟢 Додати автомобіль':
             markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
             btn1 = types.KeyboardButton('Зерновоз')
             btn2 = types.KeyboardButton('Самосвал')
@@ -239,14 +239,14 @@ class DialogManager:
             self.bot.register_next_step_handler(message, process_car_type_step)
             return True
 
-        if message.text == 'Видалити автомобіль':
+        if message.text == '🔴 Видалити автомобіль':
 
             self.bot.send_message(message.chat.id, 'Введіть id:')
 
             self.bot.register_next_step_handler(message, proccess_car_delete)
             return True
 
-        if message.text == 'Переглянути список всіх автомобілів':
+        if message.text == '📝 Переглянути список всіх автомобілів':
             if not message.chat.id in self.user_dict:
                 self.user_dict[message.chat.id] = 0
 
@@ -296,26 +296,84 @@ class DialogManager:
         return False 
         
     def calculator_dialog(self, message):
-        if message.text == 'Калькулятори':
+        def process_calc_type_1_step_1(message):
+            wasted_fuel = message.text
+            self.bot.send_message(message.chat.id, 'Введіть відстань яку ви проїхали (км)')
+            self.bot.register_next_step_handler(message, process_calc_type_1_step_2, wasted_fuel)
+        
+        def process_calc_type_1_step_2(message, wasted_fuel):
+            try:
+                distance = int(message.text)
+                wasted_fuel = int(wasted_fuel)
+                result = wasted_fuel / distance * 100
+                self.bot.send_message(message.chat.id, f'{"{:.1f}".format(result)} л/км')
+            except:
+                self.bot.send_message(message.chat.id, f'Помикла, спробуйте ще раз')
+            self.default_message(message)
+
+        def process_calc_type_2_step_1(message):
+            wasted_fuel = message.text
+            self.bot.send_message(message.chat.id, 'Введіть вартість 1 л топлива (грн)')
+            self.bot.register_next_step_handler(message, process_calc_type_2_step_2, wasted_fuel)
+
+        def process_calc_type_2_step_2(message, wasted_fuel):
+            fuel_cost = message.text
+            self.bot.send_message(message.chat.id, 'Введіть відстань яку потрібно проїхати (км)')
+            self.bot.register_next_step_handler(message, process_calc_type_2_step_3, wasted_fuel, fuel_cost)
+
+        def process_calc_type_2_step_3(message, wasted_fuel, fuel_cost):
+            try:
+                distance = int(message.text)
+                wasted_fuel = int(wasted_fuel)
+                fuel_cost = int(fuel_cost)
+
+                result = wasted_fuel / 100 * fuel_cost
+
+                self.bot.send_message(message.chat.id, f'Вартість 1 км: {"{:.1f}".format(result)} грн')
+                self.bot.send_message(message.chat.id, f'Вартість {str(distance)} км: {"{:.1f}".format(result * distance)} грн')
+            except:
+                self.bot.send_message(message.chat.id, f'Помикла, спробуйте ще раз11')
+            self.default_message(message)
+
+        def process_calc_type_3_step_1(message):
+            wasted_fuel = message.text
+            self.bot.send_message(message.chat.id, 'Введіть потужність двигуна (к. с.)')
+            self.bot.register_next_step_handler(message, process_calc_type_3_step_2, wasted_fuel)
+        
+        def process_calc_type_3_step_2(message, wasted_fuel):
+            try:
+                engine_power = int(message.text)
+                wasted_fuel = int(wasted_fuel)
+                result = 0.7 * wasted_fuel * engine_power / 1000 * 0.84
+                self.bot.send_message(message.chat.id, f'{"{:.1f}".format(result)} л/год')
+            except:
+                self.bot.send_message(message.chat.id, f'Помикла, спробуйте ще раз')
+            self.default_message(message)
+
+
+        if message.text == '🧮 Калькулятори':
             markup = types.ReplyKeyboardMarkup(row_width=1)
-            btn1 = types.KeyboardButton('Розрахунок розходу та вартості палива')
-            btn2 = types.KeyboardButton('Розрахунок середнього розходу палива')
-            btn3 = types.KeyboardButton('Розрахунок залишків палива')
-            btn4 = types.KeyboardButton('Назад')
+            btn1 = types.KeyboardButton('📝 Розрахунок розходу на 100 км')
+            btn2 = types.KeyboardButton('📝 Розрахунок вартості палива на 1 км')
+            btn3 = types.KeyboardButton('📝 Розрахунок розходу палива на годину роботи')
+            btn4 = types.KeyboardButton('⬅️ Назад')
             markup.add(btn1, btn2, btn3, btn4)
             self.bot.send_message(message.chat.id, "Виберіть:", reply_markup=markup)
             return True
 
-        if message.text == 'Розрахунок розходу та вартості палива':
-            self.bot.send_message(message.chat.id, 'WIP')
+        if message.text == '📝 Розрахунок розходу на 100 км':
+            self.bot.send_message(message.chat.id, 'Введіть витрачене паливо (л)')
+            self.bot.register_next_step_handler(message, process_calc_type_1_step_1)
             return True
 
-        if message.text == 'Розрахунок середнього розходу палива':
-            self.bot.send_message(message.chat.id, 'WIP')
+        if message.text == '📝 Розрахунок вартості палива на 1 км':
+            self.bot.send_message(message.chat.id, 'Введіть розхід топлива на 100 км. (л/км)')
+            self.bot.register_next_step_handler(message, process_calc_type_2_step_1)
             return True
 
-        if message.text == 'Розрахунок залишків палива':
-            self.bot.send_message(message.chat.id, 'WIP')
+        if message.text == '📝 Розрахунок розходу палива на годину роботи':
+            self.bot.send_message(message.chat.id, 'Введіть питомий розхід палива (гкВт/год)')
+            self.bot.register_next_step_handler(message, process_calc_type_3_step_1)
             return True
 
         return False
@@ -352,33 +410,33 @@ class DialogManager:
             self.bot.send_message(message.chat.id, 'Готово')
             self.default_message(message)
 
-        if message.text == 'Облік залишків палива':
+        if message.text == '⛽ Облік залишків палива':
             markup = types.ReplyKeyboardMarkup(row_width=2)
-            btn1 = types.KeyboardButton('Додати паливо до складу')
-            btn2 = types.KeyboardButton('Додати паливо до техніки')
-            btn3 = types.KeyboardButton('Видалити паливо з складу')
-            btn4 = types.KeyboardButton('Перегляд залишків палива')
-            btn5 = types.KeyboardButton('Назад')
+            btn1 = types.KeyboardButton('🟢 Додати паливо до складу')
+            btn2 = types.KeyboardButton('🚛 Додати паливо до техніки')
+            btn3 = types.KeyboardButton('🔴 Видалити паливо з складу')
+            btn4 = types.KeyboardButton('📝 Перегляд залишків палива')
+            btn5 = types.KeyboardButton('⬅️ Назад')
             markup.add(btn1, btn2, btn3, btn4, btn5)
             self.bot.send_message(message.chat.id, "Виберіть:", reply_markup=markup)
             return True
 
-        if message.text == 'Додати паливо до складу':
+        if message.text == '🟢 Додати паливо до складу':
             self.bot.send_message(message.chat.id, "Введіть кількість палива:")
             self.bot.register_next_step_handler(message, process_add_fuel)
             return True
     
-        if message.text == 'Додати паливо до техніки':
+        if message.text == '🚛 Додати паливо до техніки':
             self.bot.send_message(message.chat.id, "Введіть id техніки:")
             self.bot.register_next_step_handler(message, process_add_fuel_to_car_step_1)
             return True
 
-        if message.text == 'Видалити паливо з складу':
+        if message.text == '🔴 Видалити паливо з складу':
             self.bot.send_message(message.chat.id, "Введіть кількість палива:")
             self.bot.register_next_step_handler(message, process_remove_fuel)
             return True
 
-        if message.text == 'Перегляд залишків палива':
+        if message.text == '📝 Перегляд залишків палива':
             self.bot.send_message(message.chat.id, f'Паливо на складі: {self.fuel_manager.get_fuel()} л.')
             return True
         
