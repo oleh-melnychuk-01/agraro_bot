@@ -45,7 +45,20 @@ class Database:
 
     def remove(self, id):
         self.db[self.db_name].delete_one({'_id': self.convert_id(id)})
-   
+
+class Calculator:
+    @staticmethod
+    def fuel_consumption(distance, wasted_fuel):
+        return wasted_fuel / distance * 100
+
+    @staticmethod
+    def fuel_cost(wasted_fuel, fuel_cost):
+        return wasted_fuel / 100 * fuel_cost
+
+    @staticmethod
+    def fuel_consumption_per_hour(wasted_fuel, engine_power):
+        return 0.7 * wasted_fuel * engine_power / 1000 * 0.84
+
 class Car:
     def __init__(self, car_type):
         self.type = car_type
@@ -305,7 +318,7 @@ class DialogManager:
             try:
                 distance = int(message.text)
                 wasted_fuel = int(wasted_fuel)
-                result = wasted_fuel / distance * 100
+                result = Calculator.fuel_consumption(distance, wasted_fuel)
                 self.bot.send_message(message.chat.id, f'{"{:.1f}".format(result)} л/км')
             except:
                 self.bot.send_message(message.chat.id, f'Помикла, спробуйте ще раз')
@@ -327,7 +340,7 @@ class DialogManager:
                 wasted_fuel = int(wasted_fuel)
                 fuel_cost = int(fuel_cost)
 
-                result = wasted_fuel / 100 * fuel_cost
+                result = Calculator.fuel_cost(wasted_fuel, fuel_cost)
 
                 self.bot.send_message(message.chat.id, f'Вартість 1 км: {"{:.1f}".format(result)} грн')
                 self.bot.send_message(message.chat.id, f'Вартість {str(distance)} км: {"{:.1f}".format(result * distance)} грн')
@@ -344,7 +357,7 @@ class DialogManager:
             try:
                 engine_power = int(message.text)
                 wasted_fuel = int(wasted_fuel)
-                result = 0.7 * wasted_fuel * engine_power / 1000 * 0.84
+                result = Calculator.fuel_consumption_per_hour(wasted_fuel, engine_power)
                 self.bot.send_message(message.chat.id, f'{"{:.1f}".format(result)} л/год')
             except:
                 self.bot.send_message(message.chat.id, f'Помикла, спробуйте ще раз')
@@ -414,7 +427,7 @@ class DialogManager:
             markup = types.ReplyKeyboardMarkup(row_width=2)
             btn1 = types.KeyboardButton('🟢 Додати паливо до складу')
             btn2 = types.KeyboardButton('🚛 Додати паливо до техніки')
-            btn3 = types.KeyboardButton('🔴 Видалити паливо з складу')
+            btn3 = types.KeyboardButton('🔴 Видалити паливо зі складу')
             btn4 = types.KeyboardButton('📝 Перегляд залишків палива')
             btn5 = types.KeyboardButton('⬅️ Назад')
             markup.add(btn1, btn2, btn3, btn4, btn5)
@@ -431,7 +444,7 @@ class DialogManager:
             self.bot.register_next_step_handler(message, process_add_fuel_to_car_step_1)
             return True
 
-        if message.text == '🔴 Видалити паливо з складу':
+        if message.text == '🔴 Видалити паливо зі складу':
             self.bot.send_message(message.chat.id, "Введіть кількість палива:")
             self.bot.register_next_step_handler(message, process_remove_fuel)
             return True
