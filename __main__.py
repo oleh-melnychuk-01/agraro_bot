@@ -1,5 +1,6 @@
 # pip install dnspython
 # pip install pyTelegramBotAPI
+# pip install pymongo
 
 import math
 import json
@@ -7,15 +8,13 @@ import telebot
 from telebot import types
 import pymongo
 
-import time
 
-# initialize configs
-with open('config.json') as f:
-    config = json.load(f)
+
+
 
 
 class Database:
-    def __init__(self, connection_string, db_name):
+    def __init__(self, connection_string, db_name, config):
         # initialize mongodb
         self.db_name = db_name
         self.dbclient = pymongo.MongoClient(connection_string)
@@ -59,9 +58,9 @@ class Calculator:
     def fuel_consumption_per_hour(wasted_fuel, engine_power):
         return 0.7 * wasted_fuel * engine_power / 1000 * 0.84
 
-class Car:
-    def __init__(self, car_type):
-        self.type = car_type
+class Vehicle:
+    def __init__(self, vehicle_type):
+        self.type = vehicle_type
         self.mark = None
         self.model = None
         self.number = None
@@ -72,22 +71,22 @@ class Car:
         self.manufacture_year = None
         self.fuel = 0
 
-class CarManager:
-    def __init__(self, carsdb):
-        self.db = carsdb
+class VehicleManager:
+    def __init__(self, vehiclesdb):
+        self.db = vehiclesdb
 
-    def add(self, car):
+    def add(self, vehicle):
         self.db.add({
-            'type': car.type,
-            'mark': car.mark,
-            'model': car.model,
-            'number': car.number,
-            'vin_code': car.vin_code,
-            'engine_capacity': car.engine_capacity,
-            'power': car.power,
-            'manufacture_year': car.manufacture_year,
-            'odometr': car.odometr,
-            'fuel': car.fuel
+            'type': vehicle.type,
+            'mark': vehicle.mark,
+            'model': vehicle.model,
+            'number': vehicle.number,
+            'vin_code': vehicle.vin_code,
+            'engine_capacity': vehicle.engine_capacity,
+            'power': vehicle.power,
+            'manufacture_year': vehicle.manufacture_year,
+            'odometr': vehicle.odometr,
+            'fuel': vehicle.fuel
         })
 
     def remove(self, id):
@@ -97,9 +96,9 @@ class CarManager:
         return self.db.get_list()
 
 class FuelManager:
-    def __init__(self, carsdb, fueldb):
+    def __init__(self, vehiclesdb, fueldb):
         self.fueldb = fueldb
-        self.carsdb = carsdb
+        self.vehiclesdb = vehiclesdb
     
     def get_fuel(self):
         return self.fueldb.get_list()[0]['fuel']
@@ -117,24 +116,24 @@ class FuelManager:
         
         self.fueldb.modify(0, 'fuel', new_value)
 
-    def add_to_car(self, car_id, value):
-        car_fuel = self.carsdb.get(car_id)['fuel']
+    def add_to_vehicle(self, vehicle_id, value):
+        vehicle_fuel = self.vehiclesdb.get(vehicle_id)['fuel']
         all_fuel = self.get_fuel()
 
         if all_fuel >= value:
-            car_fuel += value
+            vehicle_fuel += value
         else:
-            car_fuel += all_fuel
+            vehicle_fuel += all_fuel
 
         self.remove(value)
-        self.carsdb.modify(car_id, 'fuel', car_fuel)
+        self.vehiclesdb.modify(vehicle_id, 'fuel', vehicle_fuel)
 
 class DialogManager:
-    def __init__(self):
-        self.carsdb = Database(config['connection_string'], 'cars')
-        self.fueldb = Database(config['connection_string'], 'fuel')
-        self.car_manager = CarManager(self.carsdb)
-        self.fuel_manager = FuelManager(self.carsdb, self.fueldb)
+    def __init__(self, config):
+        self.vehiclesdb = Database(config['connection_string'], 'vehicles', config)
+        self.fueldb = Database(config['connection_string'], 'fuel', config)
+        self.vehicle_manager = VehicleManager(self.vehiclesdb)
+        self.fuel_manager = FuelManager(self.vehiclesdb, self.fueldb)
 
         self.user_dict = {}
 
@@ -148,137 +147,136 @@ class DialogManager:
 
     def default_message(self, message):
         markup = types.ReplyKeyboardMarkup(row_width=1)
-        btn1 = types.KeyboardButton('🚜 Облік автотранспорту')
+        btn1 = types.KeyboardButton('🚜 Облік техніки')
         btn2 = types.KeyboardButton('⛽ Облік залишків палива')
         btn3 = types.KeyboardButton('🧮 Калькулятори')
         markup.add(btn1, btn2, btn3)
         self.bot.send_message(message.chat.id, "Виберіть:", reply_markup=markup)
 
-    def car_dialog(self, message):
-        def proccess_car_delete(message):
+    def vehicle_dialog(self, message):
+        def proccess_vehicle_delete(message):
             try:
-                car_id = int(message.text)
-                self.car_manager.remove(car_id)
+                vehicle_id = int(message.text)
+                self.vehicle_manager.remove(vehicle_id)
                 self.bot.send_message(message.chat.id, 'Готово')
             except:
                 self.bot.send_message(message.chat.id, 'Невірний id')
             
             self.default_message(message)
 
-        def process_car_type_step(message):
-            car = Car(message.text)
+        def process_vehicle_type_step(message):
+            vehicle = Vehicle(message.text)
 
             if message.text != 'Інша техніка':
-                msg = self.bot.send_message(message.chat.id, 'Марка автомобіля')
-                self.bot.register_next_step_handler(msg, process_car_mark_step, car)
+                msg = self.bot.send_message(message.chat.id, 'Марка техніки')
+                self.bot.register_next_step_handler(msg, process_vehicle_mark_step, vehicle)
             else:
-                msg = self.bot.send_message(message.chat.id, 'Введіть тип автомобіля')
-                self.bot.register_next_step_handler(msg, process_car_type_step_2, car)
+                msg = self.bot.send_message(message.chat.id, 'Введіть тип техніки')
+                self.bot.register_next_step_handler(msg, process_vehicle_type_step_2, vehicle)
 
-        def process_car_type_step_2(message, car):
-            car.type = message.text
-            msg = self.bot.send_message(message.chat.id, 'Модель автомобіля')
-            self.bot.register_next_step_handler(msg, process_car_mark_step, car)
+        def process_vehicle_type_step_2(message, vehicle):
+            vehicle.type = message.text
+            msg = self.bot.send_message(message.chat.id, 'Модель техніки')
+            self.bot.register_next_step_handler(msg, process_vehicle_mark_step, vehicle)
 
-        def process_car_mark_step(message, car):
-            car.mark = message.text
-            msg = self.bot.send_message(message.chat.id, 'Модель автомобіля')
-            self.bot.register_next_step_handler(msg, process_car_model_step, car)
+        def process_vehicle_mark_step(message, vehicle):
+            vehicle.mark = message.text
+            msg = self.bot.send_message(message.chat.id, 'Модель техніки')
+            self.bot.register_next_step_handler(msg, process_vehicle_model_step, vehicle)
 
-        def process_car_model_step(message, car):
-            car.model = message.text
+        def process_vehicle_model_step(message, vehicle):
+            vehicle.model = message.text
             msg = self.bot.send_message(message.chat.id, 'Регістраційний номер')
-            self.bot.register_next_step_handler(msg, process_car_number_step, car)
+            self.bot.register_next_step_handler(msg, process_vehicle_number_step, vehicle)
 
-        def process_car_number_step(message, car):
-            car.number = message.text
+        def process_vehicle_number_step(message, vehicle):
+            vehicle.number = message.text
             msg = self.bot.send_message(message.chat.id, 'VIN код, номер шасі (кузова, рами)')
-            self.bot.register_next_step_handler(msg, process_car_vin_code_step, car)
+            self.bot.register_next_step_handler(msg, process_vehicle_vin_code_step, vehicle)
             
-        def process_car_vin_code_step(message, car):
-            car.vin_code = message.text
+        def process_vehicle_vin_code_step(message, vehicle):
+            vehicle.vin_code = message.text
             msg = self.bot.send_message(message.chat.id, 'Одометр (км)')
-            self.bot.register_next_step_handler(msg, process_car_odometr_step, car)
+            self.bot.register_next_step_handler(msg, process_vehicle_odometr_step, vehicle)
 
-        def process_car_odometr_step(message, car):
-            car.odometr = message.text
+        def process_vehicle_odometr_step(message, vehicle):
+            vehicle.odometr = message.text
             
             msg = self.bot.send_message(message.chat.id, 'Об’єм двигуна (л)')
-            self.bot.register_next_step_handler(msg, process_car_engine_capacity_step, car)
+            self.bot.register_next_step_handler(msg, process_vehicle_engine_capacity_step, vehicle)
 
-        def process_car_engine_capacity_step(message, car):
-            car.engine_capacity = message.text
+        def process_vehicle_engine_capacity_step(message, vehicle):
+            vehicle.engine_capacity = message.text
             
             msg = self.bot.send_message(message.chat.id, 'Потужність (к. с.)')
-            self.bot.register_next_step_handler(msg, process_car_power_step, car)
+            self.bot.register_next_step_handler(msg, process_vehicle_power_step, vehicle)
 
-        def process_car_power_step(message, car):
-            car.power = message.text
+        def process_vehicle_power_step(message, vehicle):
+            vehicle.power = message.text
             
             msg = self.bot.send_message(message.chat.id, 'Рік випуску')
-            self.bot.register_next_step_handler(msg, process_car_year_step, car)
+            self.bot.register_next_step_handler(msg, process_vehicle_year_step, vehicle)
 
-        def process_car_year_step(message, car):
-            car.manufacture_year = message.text
+        def process_vehicle_year_step(message, vehicle):
+            vehicle.manufacture_year = message.text
             
             self.bot.send_message(message.chat.id, 'Готово')
 
             self.default_message(message)
 
-            self.car_manager.add(car)
+            self.vehicle_manager.add(vehicle)
 
-        if message.text == '🚜 Облік автотранспорту':
+        if message.text == '🚜 Облік техніки':
             markup = types.ReplyKeyboardMarkup(row_width=1, one_time_keyboard=True)
-            btn1 = types.KeyboardButton('🟢 Додати автомобіль')
-            btn2 = types.KeyboardButton('🔴 Видалити автомобіль')
-            btn3 = types.KeyboardButton('📝 Переглянути список всіх автомобілів')
+            btn1 = types.KeyboardButton('🟢 Додати техніку')
+            btn2 = types.KeyboardButton('🔴 Видалити техніку')
+            btn3 = types.KeyboardButton('📝 Переглянути список техніки')
             btn4 = types.KeyboardButton('⬅️ Назад')
             markup.add(btn1, btn2, btn3, btn4)
             self.bot.send_message(message.chat.id, "Виберіть:", reply_markup=markup)    
             return True
 
-        if message.text == '🟢 Додати автомобіль':
+        if message.text == '🟢 Додати техніку':
             markup = types.ReplyKeyboardMarkup(row_width=2, one_time_keyboard=True)
             btn1 = types.KeyboardButton('Зерновоз')
             btn2 = types.KeyboardButton('Самосвал')
             btn3 = types.KeyboardButton('Фургон')
             btn4 = types.KeyboardButton('Трактор')
-            btn5 = types.KeyboardButton('Косилка')
-            btn6 = types.KeyboardButton('Сіялка')
+            btn5 = types.KeyboardButton('Косарка')
+            btn6 = types.KeyboardButton('Сівалка')
             btn7 = types.KeyboardButton('Комбайн')
             btn8 = types.KeyboardButton('Інша техніка')
-            btn9 = types.KeyboardButton('Інша техніка')
 
             markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8)
             self.bot.send_message(message.chat.id, 'Виберіть тип', reply_markup=markup)
             
-            self.bot.register_next_step_handler(message, process_car_type_step)
+            self.bot.register_next_step_handler(message, process_vehicle_type_step)
             return True
 
-        if message.text == '🔴 Видалити автомобіль':
+        if message.text == '🔴 Видалити техніку':
 
             self.bot.send_message(message.chat.id, 'Введіть id:')
 
-            self.bot.register_next_step_handler(message, proccess_car_delete)
+            self.bot.register_next_step_handler(message, proccess_vehicle_delete)
             return True
 
-        if message.text == '📝 Переглянути список всіх автомобілів':
+        if message.text == '📝 Переглянути список техніки':
             if not message.chat.id in self.user_dict:
                 self.user_dict[message.chat.id] = 0
 
-            cars = self.car_manager.get_list()
-            show_cars = []
+            vehicles = self.vehicle_manager.get_list()
+            show_vehicles = []
             for i in range(0, 3):
                 try:
-                    show_cars.append(cars[i])
+                    show_vehicles.append(vehicles[i])
                 except:
                     break
             
-            if len(show_cars) == 0:
+            if len(show_vehicles) == 0:
                 self.bot.send_message(message.chat.id, 'В парку немає техніки')
                 return True
 
-            pages_count = str(math.trunc(cars.collection.count_documents({}) / 3 + 1))
+            pages_count = str(math.trunc(vehicles.collection.count_documents({}) / 3 + 1))
 
             markup = types.InlineKeyboardMarkup()
             markup.row_width = 3
@@ -288,20 +286,20 @@ class DialogManager:
 
             index = 0
             text = ''
-            for car in show_cars:
+            for vehicle in show_vehicles:
                 text += '---------\n'
                 text += 'id: ' + str(index) + '\n'
                 
-                text += 'Тип автомобіля: ' + car['type'] + '\n'
-                text += 'Марка: ' + car['mark'] + '\n'
-                text += 'Модель: ' + car['model'] + '\n'
-                text += 'Регістраційний номер: ' + car['number'] + '\n'
-                text += 'VIN код, номер шасі (кузова, рами): ' + car['vin_code'] + '\n'
-                text += 'Об’єм двигуна (л): ' + car['engine_capacity'] + '\n'
-                text += 'Потужність (к. с.): ' + car['power'] + '\n'
-                text += 'Рік випуску: ' + car['manufacture_year'] + '\n'
-                text += 'Одометр: ' + car['odometr'] + ' км\n'
-                text += 'Паливо: ' + str(car['fuel']) + ' л\n'
+                text += 'Тип техніки: ' + vehicle['type'] + '\n'
+                text += 'Марка: ' + vehicle['mark'] + '\n'
+                text += 'Модель: ' + vehicle['model'] + '\n'
+                text += 'Регістраційний номер: ' + vehicle['number'] + '\n'
+                text += 'VIN код, номер шасі (кузова, рами): ' + vehicle['vin_code'] + '\n'
+                text += 'Об’єм двигуна (л): ' + vehicle['engine_capacity'] + '\n'
+                text += 'Потужність (к. с.): ' + vehicle['power'] + '\n'
+                text += 'Рік випуску: ' + vehicle['manufacture_year'] + '\n'
+                text += 'Одометр: ' + vehicle['odometr'] + ' км\n'
+                text += 'Паливо: ' + str(vehicle['fuel']) + ' л\n'
                 index += 1
             text += '---------\n'
             text += 'Сторінка 1/' + pages_count
@@ -415,14 +413,14 @@ class DialogManager:
 
             self.default_message(message)
             
-        def process_add_fuel_to_car_step_1(message):
-            car_id = int(message.text)
+        def process_add_fuel_to_vehicle_step_1(message):
+            vehicle_id = int(message.text)
             self.bot.send_message(message.chat.id, "Введіть кількість палива:")
-            self.bot.register_next_step_handler(message, process_add_fuel_to_car_step_2, car_id)
+            self.bot.register_next_step_handler(message, process_add_fuel_to_vehicle_step_2, vehicle_id)
 
-        def process_add_fuel_to_car_step_2(message, car_id):
+        def process_add_fuel_to_vehicle_step_2(message, vehicle_id):
             fuel = int(message.text)
-            self.fuel_manager.add_to_car(car_id, fuel)
+            self.fuel_manager.add_to_vehicle(vehicle_id, fuel)
             self.bot.send_message(message.chat.id, 'Готово')
             self.default_message(message)
 
@@ -444,7 +442,7 @@ class DialogManager:
     
         if message.text == '🚛 Додати паливо до техніки':
             self.bot.send_message(message.chat.id, "Введіть id техніки:")
-            self.bot.register_next_step_handler(message, process_add_fuel_to_car_step_1)
+            self.bot.register_next_step_handler(message, process_add_fuel_to_vehicle_step_1)
             return True
 
         if message.text == '🔴 Видалити паливо зі складу':
@@ -476,7 +474,7 @@ class DialogManager:
                     current_step -= 3
 
             elif call.data == 'cb_next':
-                if current_step <= self.car_manager.get_list().collection.count_documents({}) - 3:
+                if current_step <= self.vehicle_manager.get_list().collection.count_documents({}) - 3:
                     current_step += 3
                 else:
                     return
@@ -489,33 +487,33 @@ class DialogManager:
                 
             self.user_dict[call.message.chat.id] = current_step
 
-            cars = self.car_manager.get_list()
-            show_cars = []
+            vehicles = self.vehicle_manager.get_list()
+            show_vehicles = []
             for i in range(current_step, current_step + 3):
                 try:
-                    show_cars.append(cars[i])
+                    show_vehicles.append(vehicles[i])
                 except:
                     break
 
             current_page = str(math.trunc(current_step / 3 + 1))
-            pages_count = str(math.trunc(cars.collection.count_documents({}) / 3 + 1))
+            pages_count = str(math.trunc(vehicles.collection.count_documents({}) / 3 + 1))
 
             index = 0
             text = ''
-            for car in show_cars:
+            for vehicle in show_vehicles:
                 text += '---------\n'
                 text += 'id: ' + str(index + current_step) + '\n'
                 
-                text += 'Тип автомобіля: ' + car['type'] + '\n'
-                text += 'Марка: ' + car['mark'] + '\n'
-                text += 'Модель: ' + car['model'] + '\n'
-                text += 'Регістраційний номер: ' + car['number'] + '\n'
-                text += 'VIN код, номер шасі (кузова, рами): ' + car['vin_code'] + '\n'
-                text += 'Об’єм двигуна (л): ' + car['engine_capacity'] + '\n'
-                text += 'Потужність (к. с.): ' + car['power'] + '\n'
-                text += 'Рік випуску: ' + car['manufacture_year'] + '\n'
-                text += 'Одометр: ' + car['odometr'] + ' км\n'
-                text += 'Паливо: ' + str(car['fuel']) + ' л\n'
+                text += 'Тип автомобіля: ' + vehicle['type'] + '\n'
+                text += 'Марка: ' + vehicle['mark'] + '\n'
+                text += 'Модель: ' + vehicle['model'] + '\n'
+                text += 'Регістраційний номер: ' + vehicle['number'] + '\n'
+                text += 'VIN код, номер шасі (кузова, рами): ' + vehicle['vin_code'] + '\n'
+                text += 'Об’єм двигуна (л): ' + vehicle['engine_capacity'] + '\n'
+                text += 'Потужність (к. с.): ' + vehicle['power'] + '\n'
+                text += 'Рік випуску: ' + vehicle['manufacture_year'] + '\n'
+                text += 'Одометр: ' + vehicle['odometr'] + ' км\n'
+                text += 'Паливо: ' + str(vehicle['fuel']) + ' л\n'
 
                 index += 1
 
@@ -530,15 +528,21 @@ class DialogManager:
 
         @self.bot.message_handler(func=lambda message: True)
         def handle_all_messages(message):
-            if not self.car_dialog(message):
+            if not self.vehicle_dialog(message):
                 if not self.fuel_dialog(message):
                     if not self.calculator_dialog(message):
                         self.default_message(message)
 
 
+def load_config():
+    with open('config.json') as f:
+        config = json.load(f)
+    return config
 
 def main():
-    dialog = DialogManager()
+    config = load_config()
+
+    dialog = DialogManager(config)
     dialog.start()
 
 
