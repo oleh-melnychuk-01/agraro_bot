@@ -504,7 +504,7 @@ class DialogManager:
                 text += '---------\n'
                 text += 'id: ' + str(index + current_step) + '\n'
                 
-                text += 'Тип автомобіля: ' + vehicle['type'] + '\n'
+                text += 'Тип техніки: ' + vehicle['type'] + '\n'
                 text += 'Марка: ' + vehicle['mark'] + '\n'
                 text += 'Модель: ' + vehicle['model'] + '\n'
                 text += 'Регістраційний номер: ' + vehicle['number'] + '\n'
